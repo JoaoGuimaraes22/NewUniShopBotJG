@@ -12,13 +12,13 @@ using Microsoft.Bot.Builder.Dialogs.Choices;
 
 namespace UniBotJG.Dialogs.Greeting
 {
-    public class UserProfileDialog : ComponentDialog
+    public class GreetingDialog : ComponentDialog
     {
         //Acesses UserProfile class
         private readonly IStatePropertyAccessor<UserProfile> _userProfileAccessor;
 
-        public UserProfileDialog(UserState userState)
-            : base(nameof(UserProfileDialog))
+        public GreetingDialog(UserState userState)
+            : base(nameof(GreetingDialog))
         {
             _userProfileAccessor = userState.CreateProperty<UserProfile>("UserProfile") ?? throw new ArgumentNullException(nameof(_userProfileAccessor));
 
@@ -58,7 +58,7 @@ namespace UniBotJG.Dialogs.Greeting
 
         private static async Task<DialogTurnResult> NameStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            stepContext.Values["transport"] = ((FoundChoice)stepContext.Result).Value;
+           
 
             return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter your name.") }, cancellationToken);
         }
@@ -83,7 +83,7 @@ namespace UniBotJG.Dialogs.Greeting
                 var promptOptions = new PromptOptions
                 {
                     Prompt = MessageFactory.Text("Please enter your age."),
-                    RetryPrompt = MessageFactory.Text("The value entered must be greater than 0 and less than 150."),
+                    RetryPrompt = MessageFactory.Text("The value entered must be greater than 14 and less than 100."),
                 };
 
                 return await stepContext.PromptAsync(nameof(NumberPrompt<int>), promptOptions, cancellationToken);
@@ -139,7 +139,7 @@ namespace UniBotJG.Dialogs.Greeting
         private static Task<bool> AgePromptValidatorAsync(PromptValidatorContext<int> promptContext, CancellationToken cancellationToken)
         {
             // This condition is our validation rule. You can also change the value at this point.
-            return Task.FromResult(promptContext.Recognized.Succeeded && promptContext.Recognized.Value > 0 && promptContext.Recognized.Value < 150);
+            return Task.FromResult(promptContext.Recognized.Succeeded && promptContext.Recognized.Value > 14 && promptContext.Recognized.Value < 100);
         }
 
     }
