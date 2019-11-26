@@ -3,26 +3,34 @@
 //
 // Generated with Bot Builder V4 SDK Template for Visual Studio EchoBot v4.6.2
 
+using Microsoft.Bot.Builder;
+using Microsoft.Bot.Builder.Dialogs;
+using Microsoft.Bot.Schema;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Bot.Builder;
-using Microsoft.Bot.Schema;
 using UniBotJG.StateManagement;
+using UniBotJG.Dialogs;
 
 namespace UniBotJG.Bots
 {
-    public class UniBot : ActivityHandler
+    public class UniBot<T> : ActivityHandler where T : Dialog
     {
         //Isntantiates botstate for bot usage
         private readonly BotState _conversationState;
         private readonly BotState _userState;
+        private readonly Dialog _dialog;
+        private readonly ILogger _logger;
 
-        public UniBot(ConversationState conversationState, UserState userState)
+        public UniBot(ConversationState conversationState, UserState userState, T dialog, ILogger<UniBot<T>> logger)
         {
             //Initiates states in bot
             _conversationState = conversationState;
             _userState = userState;
+            _dialog = dialog;
+            _logger = logger;
+
         }
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
@@ -33,9 +41,11 @@ namespace UniBotJG.Bots
             var userStateAccessors = _userState.CreateProperty<UserProfile>(nameof(UserProfile));
             var userProfile = await userStateAccessors.GetAsync(turnContext, () => new UserProfile());
 
-            
+            //Logger info
+            _logger.LogInformation("Running dialog with Message Activity.");
 
-            await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Echo: You said this {turnContext.Activity.Text}"), cancellationToken);
+            //Run dialog with new message activity
+            await _dialog.RunAsync(turnContext, _conversationState.CreateProperty<DialogState>(nameof(DialogState)), cancellationToken);
         }
 
         //Saves state changes
