@@ -14,23 +14,38 @@ namespace UniBotJG.Bots
 {
     public class UniBot : ActivityHandler
     {
+        //Isntantiates botstate for bot usage
         private readonly BotState _conversationState;
         private readonly BotState _userState;
 
         public UniBot(ConversationState conversationState, UserState userState)
         {
+            //Initiates states in bot
             _conversationState = conversationState;
             _userState = userState;
         }
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
+            //Gets the state properties from the turn context
             var conversationStateAccessors = _conversationState.CreateProperty<ConversationData>(nameof(ConversationData));
             var conversationData = await conversationStateAccessors.GetAsync(turnContext, () => new ConversationData());
             var userStateAccessors = _userState.CreateProperty<UserProfile>(nameof(UserProfile));
             var userProfile = await userStateAccessors.GetAsync(turnContext, () => new UserProfile());
 
-            await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Echo: {turnContext.Activity.Text}"), cancellationToken);
+            
+
+            await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Echo: You said this {turnContext.Activity.Text}"), cancellationToken);
+        }
+
+        //Saves state changes
+        public override async Task OnTurnAsync(ITurnContext turnContext, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            await base.OnTurnAsync(turnContext, cancellationToken);
+
+            // Save any state changes that might have occured during the turn.
+            await _conversationState.SaveChangesAsync(turnContext, false, cancellationToken);
+            await _userState.SaveChangesAsync(turnContext, false, cancellationToken);
         }
 
         protected override async Task OnMembersAddedAsync(IList<ChannelAccount> membersAdded, ITurnContext<IConversationUpdateActivity> turnContext, CancellationToken cancellationToken)

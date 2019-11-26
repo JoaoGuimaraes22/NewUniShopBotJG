@@ -8,5 +8,6 @@ namespace UniBotJG.StateManagement
     public class ConversationData
     {
         //Storing Conversation Data
+        public bool PromptedUserForName { get; set; }
     }
 }

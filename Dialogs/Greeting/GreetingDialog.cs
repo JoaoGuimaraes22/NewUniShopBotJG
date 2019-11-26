@@ -7,5 +7,6 @@ namespace UniBotJG.Dialogs.Greeting
 {
     public class GreetingDialog
     {
+
     }
 }
