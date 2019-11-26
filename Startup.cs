@@ -27,6 +27,17 @@ namespace UniBotJG
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            //Creates storage for bot ****(implement blob/sql storage late)****
+            var storage = new MemoryStorage();
+
+            //Adds userState to MemoryStorage
+            var userState = new UserState(storage);
+            services.AddSingleton(userState);
+
+            //Adds conversationState to MemoryStorage
+            var conversationState = new ConversationState(storage);
+            services.AddSingleton(conversationState);
+
             //Set endpointRouting = false
             services.AddMvc(options => options.EnableEndpointRouting = false);
 
