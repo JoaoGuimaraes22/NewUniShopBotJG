@@ -8,13 +8,28 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Schema;
+using UniBotJG.StateManagement;
 
 namespace UniBotJG.Bots
 {
     public class UniBot : ActivityHandler
     {
+        private readonly BotState _conversationState;
+        private readonly BotState _userState;
+
+        public UniBot(ConversationState conversationState, UserState userState)
+        {
+            _conversationState = conversationState;
+            _userState = userState;
+        }
+
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
+            var conversationStateAccessors = _conversationState.CreateProperty<ConversationData>(nameof(ConversationData));
+            var conversationData = await conversationStateAccessors.GetAsync(turnContext, () => new ConversationData());
+            var userStateAccessors = _userState.CreateProperty<UserProfile>(nameof(UserProfile));
+            var userProfile = await userStateAccessors.GetAsync(turnContext, () => new UserProfile());
+
             await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Echo: {turnContext.Activity.Text}"), cancellationToken);
         }
 
