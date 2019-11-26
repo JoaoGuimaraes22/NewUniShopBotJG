@@ -11,7 +11,7 @@ using Microsoft.Bot.Schema;
 
 namespace UniBotJG.Bots
 {
-    public class EchoBot : ActivityHandler
+    public class UniBot : ActivityHandler
     {
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
