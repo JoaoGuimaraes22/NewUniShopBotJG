@@ -8,6 +8,8 @@ namespace UniBotJG.StateManagement
     public class ConversationData
     {
         //Storing Conversation Data
+
+        //Check if user gave permission for data storage during conversation
         public bool PromptedUserForName { get; set; }
     }
 }
