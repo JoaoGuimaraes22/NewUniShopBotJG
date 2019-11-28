@@ -9,6 +9,8 @@ using System.Threading;
 using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Logging;
 using Microsoft.Bot.Builder.Dialogs.Choices;
+//using UniBotJG.Dialogs.MainDialog;
+using UniBotJG.Dialogs;
 
 namespace UniBotJG.Dialogs.Greeting
 {
@@ -16,154 +18,148 @@ namespace UniBotJG.Dialogs.Greeting
     {
         //Acesses UserProfile class
         private readonly IStatePropertyAccessor<UserProfile> _userProfileAccessor;
-
-        public GreetingDialog(UserState userState)
+        private readonly IStatePropertyAccessor<ConversationData>_conversationDataAcessor;
+        public GreetingDialog(UserState userState, ConversationState conversationState)
             : base(nameof(GreetingDialog))
         {
             _userProfileAccessor = userState.CreateProperty<UserProfile>("UserProfile") ?? throw new ArgumentNullException(nameof(_userProfileAccessor));
-
+            _conversationDataAcessor = conversationState.CreateProperty<ConversationData>("ConversationData") ?? throw new ArgumentNullException(nameof(_conversationDataAcessor));
             //Creates an array of a dialog set
             var waterfallSteps = new WaterfallStep[]
             {
+                GetToKnowYouAsync,
+                GetToKnowYouPermissionAsync,
                 NameStepAsync,
                 NameConfirmStepAsync,
                 AgeStepAsync,
-                ConfirmStepAsync,
+                AgeConfirmStepAsync,
                 SummaryStepAsync,
-                SummaryConfirmationAsync,
-                ByeStepAsync,
+                NextStepAsync,
             };
 
             // Add named dialogs to the DialogSet. These names are saved in the dialog state.
+            // AddDialog(new AcessAccount());
             AddDialog(new WaterfallDialog(nameof(WaterfallDialog), waterfallSteps));
             AddDialog(new TextPrompt(nameof(TextPrompt)));
-            AddDialog(new NumberPrompt<int>(nameof(NumberPrompt<int>), AgePromptValidatorAsync));
+            AddDialog(new NumberPrompt<int>(nameof(NumberPrompt<int>))); /*AgePromptValidatorAsync*/
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
+            
 
             //Initial child Dialog to run 
             InitialDialogId = nameof(WaterfallDialog);
         }
-
-        private static async Task<DialogTurnResult> NameStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> GetToKnowYouAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-           
+            string askPermission = "To provide a better service, we would like it if you could provide us with your name and age.\nWould you like to give this info?";
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text($"{askPermission}") }, cancellationToken);
+        }
 
-            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Hey! Please enter your name.") }, cancellationToken);
+        private async Task<DialogTurnResult> GetToKnowYouPermissionAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            //Gets bool True if Yes and bool False if No from GetToKnowYouAsync
+            //Yes
+            if ((bool)stepContext.Result)
+            {
+                var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
+                userProfile.GavePermission = true;
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Ok, thanks.\nPlease enter your name.") }, cancellationToken);
+            }
+            //No
+            //Do later
+            // separate into more watterfall dialogs || retry prompts
+            else
+            {
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Ok then, anything I can help?")}, cancellationToken);
+            }
+        }
+
+        private async Task<DialogTurnResult> NameStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            //Saves name to storage
+            var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
+            userProfile.Name = (string)stepContext.Result;
+
+            //Confirms name
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text($"Thanks, to confirm, your name is {userProfile.Name}, right?") });
         }
 
         private async Task<DialogTurnResult> NameConfirmStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            stepContext.Values["name"] = (string)stepContext.Result;
-
-            // We can send messages to the user at any point in the WaterfallStep.
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Thanks, {stepContext.Result}."), cancellationToken);
-
-            // WaterfallStep always finishes with the end of the Waterfall or with another dialog; here it is a Prompt Dialog.
-            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Would you like to give your age?") }, cancellationToken);
+            //Ask for age after name confirmation
+            //Yes
+            if ((bool)stepContext.Result)
+            {
+                return await stepContext.PromptAsync(nameof(NumberPrompt<int>), new PromptOptions { Prompt = MessageFactory.Text("Ok, thanks.\nNow, please enter your age.") });
+            }
+            //No
+            //Do later 
+            // separate into more watterfall dialogs || retry prompts
+            else
+            {
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Ok then, anything I can help?") }, cancellationToken);
+            }
         }
 
         private async Task<DialogTurnResult> AgeStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            if ((bool)stepContext.Result)
-            {
-                // User said "yes" so we will be prompting for the age.
-                // WaterfallStep always finishes with the end of the Waterfall or with another dialog, here it is a Prompt Dialog.
-                var promptOptions = new PromptOptions
-                {
-                    Prompt = MessageFactory.Text("Please enter your age."),
-                    RetryPrompt = MessageFactory.Text("The value entered must be greater than 14 and less than 100."),
-                };
+            //Saves name to storage
+            var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
+            userProfile.Age = (int)stepContext.Result;
 
-                return await stepContext.PromptAsync(nameof(NumberPrompt<int>), promptOptions, cancellationToken);
-            }
-            else
-            {
-                // User said "no" so we will skip the next step. Give -1 as the age.
-                return await stepContext.NextAsync(-1, cancellationToken);
-            }
+            //Confirms name
+            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text($"Thank you!\nTo confirm, you're {userProfile.Age} years old, right?") });
         }
 
-        private async Task<DialogTurnResult> ConfirmStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> AgeConfirmStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            stepContext.Values["age"] = (int)stepContext.Result;
-
-            var msg = (int)stepContext.Values["age"] == -1 ? "No age given." : $"I have your age as {stepContext.Values["age"]}.";
-
-            // We can send messages to the user at any point in the WaterfallStep.
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
-
-            // WaterfallStep always finishes with the end of the Waterfall or with another dialog, here it is a Prompt Dialog.
-            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Is this ok?") }, cancellationToken);
+            //Ask for age after name confirmation
+            //Yes
+            if ((bool)stepContext.Result)
+            {
+                var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
+                return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text($"Ok, thanks.\nSo you're name is {userProfile.Name}, and you're {userProfile.Age} years old. Is this information correct?") });
+            }
+            //No
+            //Do later 
+            // separate into more watterfall dialogs || retry prompts
+            else
+            {
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Ok then, anything I can help") }, cancellationToken);
+            }
         }
 
         private async Task<DialogTurnResult> SummaryStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
+            //Ask for age after name confirmation
+            //Yes
             if ((bool)stepContext.Result)
             {
-                // Get the current profile object from user state.
-                var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
-                userProfile.Name = (string)stepContext.Values["name"];
-                userProfile.Age = (int)stepContext.Values["age"];
-
-                var msg = $"I have your name as {userProfile.Name}.";
-                if (userProfile.Age != -1)
-                {
-                    msg += $" And age as {userProfile.Age}.";
-                }
-
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text($"Alright! How can I help?") });
             }
+            //No
+            //Do later 
+            // separate into more watterfall dialogs || retry prompts
             else
             {
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Thanks. Your profile will not be kept."), cancellationToken);
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Ok then, anything I can help?") }, cancellationToken);
             }
-            
-
-            // WaterfallStep always finishes with the end of the Waterfall or with another dialog, here it is the end.
-            return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Is this ok?") }, cancellationToken);
         }
 
-        private async Task<DialogTurnResult> SummaryConfirmationAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> NextStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            if ((bool)stepContext.Result)
-            {
-                // Get the current profile object from user state.
-                string msg = "Ok. Your profile will be saved.";
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text(msg), cancellationToken);
-            }
-            else
-            {
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text("Thanks. Your profile will not be kept."), cancellationToken);
-            }
+            //TODO:
+            //Call LUIS to check intent
+            //See what customer wants
+            //For now just to the 'FamillyMemberAcessAccount' intent
 
-            // WaterfallStep always finishes with the end of the Waterfall or with another dialog, here it is the end.
-            return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter 'Bye' to exit.") }, cancellationToken);
-    }
+            // ***** True ***** return await stepContext.BeginDialogAsync(nameof(AcessAccount), null, cancellationToken);
 
-        private async Task<DialogTurnResult> ByeStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            var userProfile = await _userProfileAccessor.GetAsync(stepContext.Context, () => new UserProfile(), cancellationToken);
-            string userName = userProfile.Name;
-            string byeCheck = (string)stepContext.Result;
-            if (byeCheck.ToLower() == "bye") 
-            {
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Goodbye {userName}, stay awesome"), cancellationToken);
-            }
-            else
-            {
-                await stepContext.Context.SendActivityAsync(MessageFactory.Text($"Well, {userName}, we can't really talk more, because I don't know what to say, sorry! "));
-            }
-
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+            //For Testing
+            return await stepContext.EndDialogAsync(null, cancellationToken);
         }
 
 
-        private static Task<bool> AgePromptValidatorAsync(PromptValidatorContext<int> promptContext, CancellationToken cancellationToken)
-        {
-            // This condition is our validation rule. You can also change the value at this point.
-            return Task.FromResult(promptContext.Recognized.Succeeded && promptContext.Recognized.Value > 14 && promptContext.Recognized.Value < 100);
-        }
 
     }
 }

@@ -64,7 +64,7 @@ namespace UniBotJG.Bots
             {
                 if (member.Id != turnContext.Activity.Recipient.Id)
                 {
-                    await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Hello and welcome!"), cancellationToken);
+                    await turnContext.SendActivityAsync(CreateActivityWithTextAndSpeak($"Hello! \nEnter anything to start."), cancellationToken);
                 }
             }
         }
